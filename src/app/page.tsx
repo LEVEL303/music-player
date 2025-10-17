@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Play, Pause, Rewind, FastForward, Volume2} from "lucide-react";
+import { Play, Pause, Rewind, FastForward, Volume2, VolumeX} from "lucide-react";
 
 export default function Home() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [volume, setVolume] = useState(0.5);
+    const [lastVolume, setLastVolume] = useState(0.5);
+    const [isMuted, setIsMuted] = useState(false);
     const [isVolumeVisible, setIsVolumeVisible] = useState(false);
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
@@ -13,6 +15,7 @@ export default function Home() {
     
     const audioRef = useRef(null);
     const isSeeking = useRef(false);
+    const hideTimer = useRef<number | null>(null);
 
     const volumePercentage = volume * 100;
 
@@ -59,10 +62,21 @@ export default function Home() {
         }
     }, [volume]);
 
-    const formatTime = (timeInSeconds) => {
+    const formatTime = (timeInSeconds: number) => {
         const minutes = Math.floor(timeInSeconds / 60);
         const seconds = Math.floor(timeInSeconds % 60);
         return `${minutes}:${seconds.toString().padStart(2, '0')}`; 
+    }
+
+    const toggleMute = () => {
+        if (isMuted) {
+            setIsMuted(false);
+            setVolume(lastVolume);
+        } else {
+            setIsMuted(true);
+            setLastVolume(volume);
+            setVolume(0);
+        }
     }
 
     const handleTimeUpdate = () => {
@@ -97,6 +111,19 @@ export default function Home() {
             setCurrentTime((newProgress / 100) * duration);
         }
     }
+
+    const handleMouseEnter = () => {
+        if (hideTimer.current) {
+            window.clearTimeout(hideTimer.current);
+        }
+        setIsVolumeVisible(true);
+    };
+
+    const handleMouseLeave = () => {
+        hideTimer.current = window.setTimeout(() => {
+            setIsVolumeVisible(false);
+        }, 300);
+    };
  
     return (
         <>         
@@ -129,7 +156,23 @@ export default function Home() {
                                 onMouseUp={handleSeekMouseUp}
                                 onChange={handleProgressChange}
                                 style={{ background: progressBackground }}
-                                className="w-full h-[5px] bg-[#262728] appearance-none cursor-pointer"
+                                className={`
+                                    w-full h-[5px] appearance-none cursor-pointer
+                                    
+                                    [&::-webkit-slider-thumb]:appearance-none
+                                    [&::-webkit-slider-thumb]:h-3
+                                    [&::-webkit-slider-thumb]:w-3
+                                    [&::-webkit-slider-thumb]:bg-white
+                                    [&::-webkit-slider-thumb]:rounded-full
+                                    [&::-webkit-slider-thumb]:border-0
+
+                                    [&::-moz-range-thumb]:appearance-none
+                                    [&::-moz-range-thumb]:h-3
+                                    [&::-moz-range-thumb]:w-3
+                                    [&::-moz-range-thumb]:bg-white
+                                    [&::-moz-range-thumb]:rounded-full
+                                    [&::-moz-range-thumb]:border-0
+                                `}
                             />
                             <div className="flex mt-[-5px] justify-between text-[0.95rem] text-[#717577]">
                                 <p>{ formatTime(currentTime) }</p>
@@ -144,9 +187,13 @@ export default function Home() {
                             </button>
                             <button className="cursor-pointer"> <FastForward/> </button>
 
-                            <div className="relative flex items-center">
-                                <button onClick={() => setIsVolumeVisible(!isVolumeVisible)} className="cursor-pointer">
-                                    <Volume2 />
+                            <div 
+                                className="relative flex items-center" 
+                                onMouseEnter={handleMouseEnter}
+                                onMouseLeave={handleMouseLeave}
+                            >
+                                <button onClick={toggleMute} className="cursor-pointer">
+                                    {isMuted || volume === 0 ? <VolumeX/> : <Volume2/>}
                                 </button>
 
                                 {isVolumeVisible && (
@@ -157,9 +204,31 @@ export default function Home() {
                                             max="1"
                                             step="0.01"
                                             value={volume}
-                                            onChange={(e) => setVolume(parseFloat(e.target.value))}
+                                            onChange={(e) => {
+                                                const newVolume = parseFloat(e.target.value);
+                                                setVolume(newVolume);
+                                                if (newVolume > 0) {
+                                                    setIsMuted(false);
+                                                }
+                                            }}
                                             style={{ background: volumeBackground}}
-                                            className="w-24 h-[5px] bg-[#262728] appearance-none cursor-pointer"
+                                            className={`
+                                                w-24 h-[5px] bg-[#262728] appearance-none cursor-pointer
+
+                                                [&::-webkit-slider-thumb]:appearance-none
+                                                [&::-webkit-slider-thumb]:h-3
+                                                [&::-webkit-slider-thumb]:w-3
+                                                [&::-webkit-slider-thumb]:bg-white
+                                                [&::-webkit-slider-thumb]:rounded-full
+                                                [&::-webkit-slider-thumb]:border-0
+
+                                                [&::-moz-range-thumb]:appearance-none
+                                                [&::-moz-range-thumb]:h-3
+                                                [&::-moz-range-thumb]:w-3
+                                                [&::-moz-range-thumb]:bg-white
+                                                [&::-moz-range-thumb]:rounded-full
+                                                [&::-moz-range-thumb]:border-0
+                                            `}
                                         />
                                         <p className="text-center text-xs mt-1">{Math.round(volume * 100)}%</p>
                                     </div>                                
