@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Play, Pause, Rewind, FastForward, Volume2, VolumeX} from "lucide-react";
+import { Play, Pause, Rewind, FastForward, Volume2, VolumeX, RotateCcw, RotateCw, Forward} from "lucide-react";
+import { musicList, type Track } from "@/data/music";
 
 export default function Home() {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -12,14 +13,15 @@ export default function Home() {
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+
+    const currentTrack = musicList[currentTrackIndex];
     
     const audioRef = useRef(null);
     const isSeeking = useRef(false);
     const hideTimer = useRef<number | null>(null);
 
-    const volumePercentage = volume * 100;
-
-    const volumeBackground = `linear-gradient(to right, #be2929 ${volumePercentage}%, #262728 ${volumePercentage}%)`;
+    const volumeBackground = `linear-gradient(to right, #be2929 ${volume * 100}%, #262728 ${volume * 100}%)`;
     const progressBackground = `linear-gradient(to right, #1a54d4 ${progress}%, #262728 ${progress}%)`;
 
     useEffect(() => {
@@ -30,10 +32,18 @@ export default function Home() {
 
     useEffect(() => {
         const audio = audioRef.current;
-
+        if (!audio) return;
+    
+        audio.load();
+        setCurrentTime(0);
+        setProgress(0);
+        if (isPlaying) {
+            audio.play();
+        }
+        
         const setAudioData = () => {
             setDuration(audio.duration);
-        }
+        };
 
         if (audio.readyState > 0) {
             setAudioData();
@@ -43,8 +53,8 @@ export default function Home() {
 
         return () => {
             audio.removeEventListener('loadedmetadata', setAudioData);
-        }
-    }, []);
+        };
+    }, [currentTrackIndex]);
 
     useEffect(() => {
         if (!isSeeking.current) {
@@ -69,7 +79,7 @@ export default function Home() {
     }
 
     const toggleMute = () => {
-        if (isMuted) {
+        if (isMuted || volume === 0) {
             setIsMuted(false);
             setVolume(lastVolume);
         } else {
@@ -82,7 +92,10 @@ export default function Home() {
     const handleTimeUpdate = () => {
         if (!isSeeking.current && audioRef.current.duration) {
             setCurrentTime(audioRef.current.currentTime);
-            setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
+            const newProgress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+            if (!isNaN(newProgress)) {
+                setProgress(newProgress);
+            }
         }
     }
     
@@ -91,9 +104,10 @@ export default function Home() {
         audioRef.current.pause();
     }
 
-    const handleSeekMouseUp = (e) => {
-        const newProgress = parseFloat(e.target.value);
-        if (duration) {
+    const handleSeekMouseUp = (e: React.MouseEvent<HTMLElement>) => {
+        const target = e.target as HTMLInputElement;
+        const newProgress = parseFloat(target.value);
+        if (duration && !isNaN(duration)) {
             audioRef.current.currentTime = (newProgress / 100) * duration;
         }
         isSeeking.current = false;
@@ -103,11 +117,11 @@ export default function Home() {
         }
     }
 
-    const handleProgressChange = (e) => {
+    const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newProgress = parseFloat(e.target.value);
         setProgress(newProgress);
 
-        if (duration) {
+        if (duration && !isNaN(duration)) {
             setCurrentTime((newProgress / 100) * duration);
         }
     }
@@ -124,24 +138,70 @@ export default function Home() {
             setIsVolumeVisible(false);
         }, 300);
     };
+
+    const playTrack = (index: number) => {
+        setCurrentTrackIndex(index);
+        setIsPlaying(true);
+    }
+
+    const handleNext = () => {
+        const nextIndex = (currentTrackIndex + 1) % musicList.length;
+        setCurrentTrackIndex(nextIndex);
+        setIsPlaying(true);
+    }
+
+    const handlePrevious = () => {
+        const prevIndex = (currentTrackIndex - 1 + musicList.length) % musicList.length;
+        setCurrentTrackIndex(prevIndex);
+        setIsPlaying(true);
+    };
+
+    const seekBackward = () => {
+        if (audioRef.current) {
+            audioRef.current.currentTime -= 10;
+        }
+    };
+
+    const seekForward = () => {
+        if (audioRef.current) {
+            audioRef.current.currentTime += 10;
+        }
+    }
  
     return (
         <>         
             <audio 
                 ref={audioRef}
-                src="/musica.mp3"
+                src={currentTrack.src}
                 onTimeUpdate={handleTimeUpdate}
+                onEnded={handleNext}
             />
 
             <div className="w-screen h-screen bg-[#222] flex justify-center items-center text-white box-border">
+                <div className="w-[300px] h-[500px] bg-[#333] rounded-lg p-6 overflow-y-auto mr-4">
+                    <h3 className="text-xl font-bold mb-4">Minhas Músicas</h3>
+                    <ul>
+                        {musicList.map((song, index) => (
+                            <li
+                                key={index}
+                                className={`p-2 rounded cursor-pointer hover:bg-[#444] ${index === currentTrackIndex ? 'bg-[#1a54d4]' : ''}`}
+                                onClick={() => playTrack(index)}
+                            >
+                                <p className="font-semibold">{song.title}</p>
+                                <p className="text-sm text-gray-400">{song.artist}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
                 <div className="w-[340px] h-[500px] bg-[#333] rounded-lg p-[60px]">
                     <div className="h-[70%] flex flex-col justify-center items-center">
                         <div className="w-full">
-                            <img src="img/capa.jpg" alt="Capa do album" className="w-full" />
+                            <img src={currentTrack.cover} alt="Capa do album" className="w-full" />
                         </div>
                         <div className="text-center">
-                            <h4 className="font-bold">Please Please Me</h4>
-                            <p className="text-sm">The Beatles</p>
+                            <h4 className="font-bold">{currentTrack.title}</h4>
+                            <p className="text-sm">{currentTrack.artist}</p>
                         </div>
                     </div>
 
@@ -151,7 +211,7 @@ export default function Home() {
                                 type="range" 
                                 min="0"
                                 max="100"
-                                value={progress}
+                                value={progress || 0}
                                 onMouseDown={handleSeekMouseDown}
                                 onMouseUp={handleSeekMouseUp}
                                 onChange={handleProgressChange}
@@ -181,11 +241,15 @@ export default function Home() {
                         </div>
 
                         <div className="flex w-[calc(100%-6px)] mt-5 justify-between">
-                            <button className="cursor-pointer"> <Rewind/> </button>
+                            <button onClick={handlePrevious} className="cursor-pointer"> <Rewind/> </button>
+                            <button onClick={seekBackward} className="cursor-pointer"> <RotateCcw size={20}/> </button>
+
                             <button onClick={() => setIsPlaying(!isPlaying)} className="bg-[#be2929] w-10 h-10 rounded-full cursor-pointer flex justify-center items-center">
                                 {isPlaying ? <Pause/> : <Play/>}
                             </button>
-                            <button className="cursor-pointer"> <FastForward/> </button>
+
+                            <button onClick={seekForward} className="cursor-pointer"> <RotateCw size={20}/> </button>
+                            <button onClick={handleNext} className="cursor-pointer"> <FastForward/> </button>
 
                             <div 
                                 className="relative flex items-center" 
